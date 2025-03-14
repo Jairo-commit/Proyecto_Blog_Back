@@ -27,31 +27,20 @@ class BlogPostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
 
-        # Si es superusuario, devuelve todo
         if user.is_superuser or user.is_staff:
             return BlogPost.objects.all()
 
-        # Si el usuario no está autenticado, filtra por permisos públicos
         if not user.is_authenticated:
             return BlogPost.objects.filter(public_access="Read")
 
-        # Construcción de filtros con Q() para evitar problemas de combinación
-        query = Q(public_access="Read") | Q(authenticated_access="Read") | Q(author=user)
+        # Base query: Public access, authenticated access, or user's own posts
+        query = Q(authenticated_access__in=["Read", "Read and Edit"]) | Q(author=user)
 
-        # Agregar filtro por grupos si hay grupos asociados
-        user_groups = user.groups.all()
-        if user_groups.exists():
-            query |= Q(group_access="Read", author__groups__in=user_groups)
+        user_groups = list(user.groups.all())  # Convert to a list to avoid queryset issues
+        if user_groups:
+            query |= Q(group_access__in=["Read", "Read and Edit"], author__groups__in=user_groups)
 
-        # Construcción de filtros con Q() para evitar problemas de combinación
-        query2 = Q(public_access="Read and Edit") | Q(authenticated_access="Read and Edit")
-
-        # Agregar filtro por grupos si hay grupos asociados
-        user_groups = user.groups.all()
-        if user_groups.exists():
-            query2 |= Q(group_access="Read and Edit", author__groups__in=user_groups)
-
-        return BlogPost.objects.filter(query).distinct() and BlogPost.objects.filter(query2).distinct()
+        return BlogPost.objects.filter(query).distinct()
 
 
     def perform_create(self, serializer):

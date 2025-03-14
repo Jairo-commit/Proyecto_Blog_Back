@@ -15,7 +15,7 @@ class CommentPermission(permissions.BasePermission):
             return True
         else:
             if isinstance(obj, BlogPost): 
-                return obj.author == user or user.groups.exists() and obj.author.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists()
+                return obj.author == user or (user.groups.exists() and obj.author.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists())
 
             if isinstance(obj, Comment):  
-                return obj.user == user or user.groups.exists() and obj.user.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists()
+                return obj.user == user or (user.groups.exists() and obj.user.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists())
