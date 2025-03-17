@@ -10,7 +10,7 @@ from interactions.models import Like, Comment
 from .models import BlogPost
 from .serializers import BlogPostSerializer
 from .permissions import BlogPostPermission 
-from interactions.serializers import CommentSerializer
+from interactions.serializers import CommentSerializer, LikeSerializer
 from .pagination import BlogPostPagination
 
 class BlogPostViewSet(viewsets.ModelViewSet):
@@ -133,7 +133,7 @@ class BlogPostViewSet(viewsets.ModelViewSet):
     
     @action(
     detail=True,
-    methods=['GET', 'POST'],  # ✅ Only allow GET requests
+    methods=['GET', 'POST'], 
     url_path='comments',  # ✅ This makes the endpoint /api/post/{post_id}/comments/
     permission_classes=[CommentPermission],
     serializer_class=CommentSerializer
@@ -160,4 +160,46 @@ class BlogPostViewSet(viewsets.ModelViewSet):
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
+    
+    @action(
+        detail=True,
+        methods=['GET'], 
+        url_path='likes', 
+        #permission_classes=[CommentPermission],
+        serializer_class=LikeSerializer
+    )
+    def list_likes(self, request, pk=None):
+        """
+        GET: Obtener todos los likes de un post.
+        """
+        post = self.get_object()
 
+        if request.method == 'GET':
+            likes = Like.objects.filter(post=post)
+            serializer = LikeSerializer(likes, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        
+    
+    @action(detail=True, 
+            methods=['GET', 'DELETE'], 
+            url_path='likes/(?P<like_pk>[^/.]+)',
+            permission_classes=[CommentPermission],
+            serializer_class=LikeSerializer) 
+    def get_comment(self, request, pk=None, like_pk=None):
+        """
+        Obtiene un comentario específico de un post.
+        """
+        post = self.get_object()  # Obtiene el post y aplica permisos
+
+        like = get_object_or_404(Like, pk=like_pk, post=post)
+
+        if request.method == 'DELETE':
+            if like.user != request.user and not request.user.is_superuser:
+                return Response({'detail': 'No tienes permiso para eliminar este like.'}, status=status.HTTP_403_FORBIDDEN)
+            like.delete()
+            return Response({'detail': 'like eliminado correctamente.'}, status=status.HTTP_204_NO_CONTENT)
+
+        serializer = LikeSerializer(like) #Default: Handle GET
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
