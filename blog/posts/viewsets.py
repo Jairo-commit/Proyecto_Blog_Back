@@ -24,6 +24,11 @@ class BlogPostViewSet(viewsets.ModelViewSet):
     permission_classes = [BlogPostPermission]
     pagination_class = BlogPostPagination
 
+    def create(self, request, *args, **kwargs):
+        if not self.request.user.is_authenticated:
+            return Response({'detail': 'Debes loguearte primero para crear post'}, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+
     def get_queryset(self):
         user = self.request.user
 

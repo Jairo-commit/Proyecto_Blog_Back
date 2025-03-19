@@ -22,6 +22,9 @@ class BlogPost(models.Model):
     group_access = models.CharField(max_length=15, choices=ACCESS_CHOICES, default='Read')
     author_access = models.CharField(max_length=15, choices=[('Read and Edit', 'Read and Edit')])
 
+    class Meta:
+        ordering = ['-created_at']  # Ordena los posts por fecha de creación (más recientes primero)
+
     def __str__(self):
         return self.title
 
