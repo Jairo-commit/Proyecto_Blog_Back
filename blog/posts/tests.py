@@ -1,17 +1,17 @@
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group
 
 
 from .models import BlogPost
 
 # Create your tests here.
 
-class PostTestCase(TestCase):
+class PostTestCase(TestCase): #Here, I'm testing unauthenticated permissions as well
 
     def setUp(self):
-        print("haciendo el setup")
+
         self.user_data = {
             'username': 'prueba', 
             'password': 'prueba123',
@@ -21,17 +21,6 @@ class PostTestCase(TestCase):
         }
         self.client.post(reverse('user_register-list'), self.user_data)
         self.user = User.objects.get(username = self.user_data['username'])
-
-        self.user_data2 = {
-            'username': 'prueba2', 
-            'password': 'prueba123',
-            'first_name': 'nombre2',
-            'last_name': 'apellido2',
-            'email': 'example2@example.com'
-        }
-
-        self.client.post(reverse('user_register-list'), self.user_data2)
-        self.user2 = User.objects.get(username = self.user_data2['username'])
 
         self.client.login(username='prueba', password='prueba123')  
 
@@ -47,35 +36,8 @@ class PostTestCase(TestCase):
         self.client.post(reverse('blogpost-list'), postdata, content_type='application/json')
 
         self.post_de_prueba = BlogPost.objects.get(title = "Post de prueba para loggueados")
-        print("primer post del setup ",self.post_de_prueba.id)
-        postdata_soloread = {
-            'title': 'Post de prueba que solo se lee',
-            'content': 'Only the author can edit this post',
-            'public_access': 'None',
-            'authenticated_access': "Read",
-            'group_access': "Read",
-            'author_access': "Read and Edit",
-        }
-        self.client.post(reverse('blogpost-list'), postdata_soloread, content_type='application/json')
-
-        self.postdata_soloread = BlogPost.objects.get(title = "Post de prueba que solo se lee")
-        print("segundo post del setup ",self.postdata_soloread.id)
-
-        postdata_soloteam = {
-            'title': 'Post de prueba que solo puede leer el group',
-            'content': 'Only the group can read, but not edit, this post',
-            'public_access': 'None',
-            'authenticated_access': "None",
-            'group_access': "Read",
-            'author_access': "Read and Edit",
-        }
-        self.client.post(reverse('blogpost-list'), postdata_soloteam, content_type='application/json')
-
-        self.postdata_soloteam = BlogPost.objects.get(title = "Post de prueba que solo puede leer el group")
-        print("tercer post del setup ",self.postdata_soloteam.id)
 
         self.client.logout()
-
 
 # Test relacionados para el usuario que no está logueado
 
@@ -172,4 +134,337 @@ class PostTestCase(TestCase):
 
         self.assertEqual(response_actualizado.status_code, status.HTTP_200_OK, "Error al actualizar el post")
 
-        #probando el nuevo workflow de github con este mensaje... preguntar a Jose si crear varias clases de testcases?
+
+class PostTestCase_authenticated_access(TestCase):
+    def setUp(self):
+        self.user_data = {
+            'username': 'prueba', 
+            'password': 'prueba123',
+            'first_name': 'nombre',
+            'last_name': 'apellido',
+            'email': 'example@example.com'
+        }
+        self.client.post(reverse('user_register-list'), self.user_data)
+        self.user = User.objects.get(username = self.user_data['username'])
+
+        self.user_data2 = {
+            'username': 'prueba2', 
+            'password': 'prueba1234',
+            'first_name': 'nombre2',
+            'last_name': 'apellido2',
+            'email': 'example2@example.com'
+        }
+
+        self.client.post(reverse('user_register-list'), self.user_data2)
+        self.user2 = User.objects.get(username = self.user_data2['username'])
+
+        self.user_data3 = { #Usuario en equipo diferente
+            'username': 'prueba3', 
+            'password': 'prueba12345',
+            'first_name': 'nombre3',
+            'last_name': 'apellido3',
+            'email': 'example3@example.com'
+        }
+
+        self.client.post(reverse('user_register-list'), self.user_data3)
+        self.user3 = User.objects.get(username = self.user_data3['username'])
+
+        # Create a different group for user3
+        different_group, created = Group.objects.get_or_create(name="Different Group")
+        self.user3.groups.remove(Group.objects.get(name ='default_team'))
+        self.user3.groups.add(different_group)  # Assign to Different Group
+
+        self.client.login(username='prueba', password='prueba123')  
+
+        postdata = {
+            'title': 'Post de prueba para loggueados',
+            'content': 'You gotta be logged in',
+            'public_access': 'None',
+            'authenticated_access': "Read and Edit",
+            'group_access': "Read and Edit",
+            'author_access': "Read and Edit",
+        }
+         # Crear el post autenticado
+        self.client.post(reverse('blogpost-list'), postdata, content_type='application/json')
+        self.post_de_prueba = BlogPost.objects.get(title = "Post de prueba para loggueados")
+
+        postdata_soloread = {
+            'title': 'Post de prueba que solo se lee',
+            'content': 'Only the author can edit this post',
+            'public_access': 'None',
+            'authenticated_access': "Read",
+            'group_access': "Read",
+            'author_access': "Read and Edit",
+        }
+        self.client.post(reverse('blogpost-list'), postdata_soloread, content_type='application/json')
+
+        self.postdata_soloread = BlogPost.objects.get(title = "Post de prueba que solo se lee")
+
+        postdata_soloteam = {
+            'title': 'Post de prueba que solo puede leer el group',
+            'content': 'Only the group can read, but not edit, this post',
+            'public_access': 'None',
+            'authenticated_access': "None",
+            'group_access': "Read",
+            'author_access': "Read and Edit",
+        }
+        self.client.post(reverse('blogpost-list'), postdata_soloteam, content_type='application/json')
+
+        self.postdata_soloteam = BlogPost.objects.get(title = "Post de prueba que solo puede leer el group")
+
+        self.client.logout()
+
+    def test_read_and_edit_permissions(self):
+
+        self.client.login(username='prueba2', password='prueba1234')
+        
+        response_get =self.client.get(reverse('blogpost-list'))
+        self.assertEqual(response_get.status_code, status.HTTP_200_OK)
+
+        response_get2 =self.client.get(reverse('blogpost-detail', args=[self.post_de_prueba.id]))
+        self.assertEqual(response_get2.status_code, status.HTTP_200_OK)
+
+        postdata = {
+            'title': 'Post de prueba para loggueados',
+            'content': 'You gotta be logged in edit: prueba2', #modified
+            'public_access': 'None',
+            'authenticated_access': "Read and Edit",
+            'group_access': "Read and Edit",
+            'author_access': "Read and Edit",
+        }
+        response_put = self.client.put(reverse('blogpost-detail', args=[self.post_de_prueba.id]), 
+                                       postdata, content_type="application/json")
+        self.assertEqual(response_put.status_code, status.HTTP_200_OK)
+        postdata = {
+            'title': 'Post de prueba para loggueados Edit: prueba 2 patch', #modified
+            'public_access': 'Read', #modified
+        }
+        response_patch = self.client.patch(reverse('blogpost-detail', args=[self.post_de_prueba.id]), 
+                                       postdata, content_type="application/json")
+        self.assertEqual(response_patch.status_code, status.HTTP_200_OK, "Error al actualizar el post")
+        response_delete = self.client.delete(reverse('blogpost-detail', args=[self.post_de_prueba.id]))
+        self.assertEqual(response_delete.status_code, status.HTTP_204_NO_CONTENT, "Error al borrar el post")
+
+        response_get =self.client.get('blogpost-detail', args=[self.post_de_prueba.id])
+        self.assertEqual(response_get.status_code, status.HTTP_404_NOT_FOUND) #hacer esta prueba luego, creo que se debería ubicar mejor
+
+    def test_read_permissions(self):
+        self.client.login(username='prueba2', password='prueba1234')
+
+        response_get2 =self.client.get(reverse('blogpost-detail', args=[self.postdata_soloread.id]))
+        self.assertEqual(response_get2.status_code, status.HTTP_200_OK)
+
+        postdata_soloread = {
+            'title': 'Post de prueba que solo se lee',
+            'content': 'Only the author can edit this post',
+            'public_access': 'None',
+            'authenticated_access': "Read",
+            'group_access': "Read",
+            'author_access': "Read and Edit",
+        }
+        response_put = self.client.put(reverse('blogpost-detail', args=[self.postdata_soloread.id]), 
+                                       postdata_soloread, content_type="application/json")
+        self.assertEqual(response_put.status_code, status.HTTP_403_FORBIDDEN)
+        postdata_soloread = {
+            'title': 'Post de prueba que solo se lee Edit: prueba 2 patch', #modified
+            'public_access': 'Read', #modified
+        }
+        response_patch = self.client.patch(reverse('blogpost-detail', args=[self.postdata_soloread.id]), 
+                                       postdata_soloread, content_type="application/json")
+        self.assertEqual(response_patch.status_code, status.HTTP_403_FORBIDDEN, "Error al actualizar el post")
+        response_delete = self.client.delete(reverse('blogpost-detail', args=[self.postdata_soloread.id]))
+        self.assertEqual(response_delete.status_code, status.HTTP_403_FORBIDDEN, "Error al borrar el post")
+
+    def test_none_permissions(self):
+        self.client.login(username='prueba3', password='prueba12345')
+
+        response_get2 =self.client.get(reverse('blogpost-detail', args=[self.postdata_soloteam.id]))
+        self.assertEqual(response_get2.status_code, status.HTTP_404_NOT_FOUND)
+
+        postdata_soloteam = {
+            'title': 'Post de prueba que solo puede leer el group',
+            'content': 'Only the group can read, but not edit, this post',
+            'public_access': 'None',
+            'authenticated_access': "None",
+            'group_access': "Read",
+            'author_access': "Read and Edit",
+        }
+        response_put = self.client.put(reverse('blogpost-detail', args=[self.postdata_soloteam.id]), 
+                                       postdata_soloteam, content_type="application/json")
+        self.assertEqual(response_put.status_code, status.HTTP_404_NOT_FOUND)
+        postdata_soloteam = {
+            'title': 'Post de prueba que solo puede leer el group Edit: prueba 2 patch', #modified
+            'public_access': 'Read', #modified
+        }
+        response_patch = self.client.patch(reverse('blogpost-detail', args=[self.postdata_soloteam.id]), 
+                                       postdata_soloteam, content_type="application/json")
+        self.assertEqual(response_patch.status_code, status.HTTP_404_NOT_FOUND, "Error al actualizar el post")
+        response_delete = self.client.delete(reverse('blogpost-detail', args=[self.postdata_soloteam.id]))
+        self.assertEqual(response_delete.status_code, status.HTTP_404_NOT_FOUND, "Error al borrar el post")
+    
+# class PostTestCase_group_access(TestCase):
+#     def setUp(self):
+#         self.user_data = {
+#             'username': 'prueba', 
+#             'password': 'prueba123',
+#             'first_name': 'nombre',
+#             'last_name': 'apellido',
+#             'email': 'example@example.com'
+#         }
+#         self.client.post(reverse('user_register-list'), self.user_data)
+#         self.user = User.objects.get(username = self.user_data['username'])
+
+#         self.user_data2 = {
+#             'username': 'prueba2', 
+#             'password': 'prueba1234',
+#             'first_name': 'nombre2',
+#             'last_name': 'apellido2',
+#             'email': 'example2@example.com'
+#         }
+
+#         self.client.post(reverse('user_register-list'), self.user_data2)
+#         self.user2 = User.objects.get(username = self.user_data2['username'])
+
+#         self.user_data3 = { #Usuario en equipo diferente
+#             'username': 'prueba3', 
+#             'password': 'prueba12345',
+#             'first_name': 'nombre3',
+#             'last_name': 'apellido3',
+#             'email': 'example3@example.com'
+#         }
+
+#         self.client.post(reverse('user_register-list'), self.user_data3)
+#         self.user3 = User.objects.get(username = self.user_data3['username'])
+
+#         # Create a different group for user3
+#         different_group, created = Group.objects.get_or_create(name="Different Group")
+#         self.user3.groups.remove(Group.objects.get(name ='default_team'))
+#         self.user3.groups.add(different_group)  # Assign to Different Group
+
+#         self.client.login(username='prueba', password='prueba123')  
+
+#         postdata = {
+#             'title': 'Post de prueba para loggueados',
+#             'content': 'You gotta be logged in',
+#             'public_access': 'None',
+#             'authenticated_access': "None",
+#             'group_access': "Read and Edit",
+#             'author_access': "Read and Edit",
+#         }
+#          # Crear el post autenticado
+#         self.client.post(reverse('blogpost-list'), postdata, content_type='application/json')
+#         self.post_de_prueba = BlogPost.objects.get(title = "Post de prueba para loggueados")
+
+#         postdata_soloread = {
+#             'title': 'Post de prueba que solo se lee',
+#             'content': 'Only the author can edit this post',
+#             'public_access': 'None',
+#             'authenticated_access': "None",
+#             'group_access': "Read",
+#             'author_access': "Read and Edit",
+#         }
+#         self.client.post(reverse('blogpost-list'), postdata_soloread, content_type='application/json')
+
+#         self.postdata_soloread = BlogPost.objects.get(title = "Post de prueba que solo se lee")
+
+#         postdata_soloauthor = {
+#             'title': 'Post de prueba que solo puede leer el autor',
+#             'content': 'Only the author can read this post',
+#             'public_access': 'None',
+#             'authenticated_access': "None",
+#             'group_access': "None",
+#             'author_access': "Read and Edit",
+#         }
+#         self.client.post(reverse('blogpost-list'), postdata_soloauthor, content_type='application/json')
+
+#         self.postdata_soloauthor = BlogPost.objects.get(title = "Post de prueba que solo puede leer el group")
+
+#         self.client.logout()
+
+#     def test_read_and_edit_permissions(self):
+
+#         self.client.login(username='prueba2', password='prueba1234')
+        
+#         response_get =self.client.get(reverse('blogpost-list'))
+#         self.assertEqual(response_get.status_code, status.HTTP_200_OK)
+
+#         response_get2 =self.client.get(reverse('blogpost-detail', args=[self.post_de_prueba.id]))
+#         self.assertEqual(response_get2.status_code, status.HTTP_200_OK)
+
+#         postdata = {
+#             'title': 'Post de prueba para loggueados',
+#             'content': 'You gotta be logged in edit: prueba2', #modified
+#             'public_access': 'None',
+#             'authenticated_access': "Read and Edit",
+#             'group_access': "Read and Edit",
+#             'author_access': "Read and Edit",
+#         }
+#         response_put = self.client.put(reverse('blogpost-detail', args=[self.post_de_prueba.id]), 
+#                                        postdata, content_type="application/json")
+#         self.assertEqual(response_put.status_code, status.HTTP_200_OK)
+#         postdata = {
+#             'title': 'Post de prueba para loggueados Edit: prueba 2 patch', #modified
+#             'public_access': 'Read', #modified
+#         }
+#         response_patch = self.client.patch(reverse('blogpost-detail', args=[self.post_de_prueba.id]), 
+#                                        postdata, content_type="application/json")
+#         self.assertEqual(response_patch.status_code, status.HTTP_200_OK, "Error al actualizar el post")
+#         response_delete = self.client.delete(reverse('blogpost-detail', args=[self.post_de_prueba.id]))
+#         self.assertEqual(response_delete.status_code, status.HTTP_204_NO_CONTENT, "Error al borrar el post")
+
+#         response_get =self.client.get('blogpost-detail', args=[self.post_de_prueba.id])
+#         self.assertEqual(response_get.status_code, status.HTTP_404_NOT_FOUND) #hacer esta prueba luego, creo que se debería ubicar mejor
+
+#     def test_read_permissions(self):
+#         self.client.login(username='prueba2', password='prueba1234')
+
+#         response_get2 =self.client.get(reverse('blogpost-detail', args=[self.postdata_soloread.id]))
+#         self.assertEqual(response_get2.status_code, status.HTTP_200_OK)
+
+#         postdata_soloread = {
+#             'title': 'Post de prueba que solo se lee',
+#             'content': 'Only the author can edit this post',
+#             'public_access': 'None',
+#             'authenticated_access': "Read",
+#             'group_access': "Read",
+#             'author_access': "Read and Edit",
+#         }
+#         response_put = self.client.put(reverse('blogpost-detail', args=[self.postdata_soloread.id]), 
+#                                        postdata_soloread, content_type="application/json")
+#         self.assertEqual(response_put.status_code, status.HTTP_403_FORBIDDEN)
+#         postdata_soloread = {
+#             'title': 'Post de prueba que solo se lee Edit: prueba 2 patch', #modified
+#             'public_access': 'Read', #modified
+#         }
+#         response_patch = self.client.patch(reverse('blogpost-detail', args=[self.postdata_soloread.id]), 
+#                                        postdata_soloread, content_type="application/json")
+#         self.assertEqual(response_patch.status_code, status.HTTP_403_FORBIDDEN, "Error al actualizar el post")
+#         response_delete = self.client.delete(reverse('blogpost-detail', args=[self.postdata_soloread.id]))
+#         self.assertEqual(response_delete.status_code, status.HTTP_403_FORBIDDEN, "Error al borrar el post")
+
+#     def test_none_permissions(self):
+#         self.client.login(username='prueba3', password='prueba12345')
+
+#         response_get2 =self.client.get(reverse('blogpost-detail', args=[self.postdata_soloteam.id]))
+#         self.assertEqual(response_get2.status_code, status.HTTP_404_NOT_FOUND)
+
+#         postdata_soloteam = {
+#             'title': 'Post de prueba que solo puede leer el group',
+#             'content': 'Only the group can read, but not edit, this post',
+#             'public_access': 'None',
+#             'authenticated_access': "None",
+#             'group_access': "Read",
+#             'author_access': "Read and Edit",
+#         }
+#         response_put = self.client.put(reverse('blogpost-detail', args=[self.postdata_soloteam.id]), 
+#                                        postdata_soloteam, content_type="application/json")
+#         self.assertEqual(response_put.status_code, status.HTTP_404_NOT_FOUND)
+#         postdata_soloteam = {
+#             'title': 'Post de prueba que solo puede leer el group Edit: prueba 2 patch', #modified
+#             'public_access': 'Read', #modified
+#         }
+#         response_patch = self.client.patch(reverse('blogpost-detail', args=[self.postdata_soloteam.id]), 
+#                                        postdata_soloteam, content_type="application/json")
+#         self.assertEqual(response_patch.status_code, status.HTTP_404_NOT_FOUND, "Error al actualizar el post")
+#         response_delete = self.client.delete(reverse('blogpost-detail', args=[self.postdata_soloteam.id]))
+#         self.assertEqual(response_delete.status_code, status.HTTP_404_NOT_FOUND, "Error al borrar el post")

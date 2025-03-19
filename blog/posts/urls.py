@@ -3,6 +3,6 @@ from .viewsets import BlogPostViewSet
 
 router = DefaultRouter()
 
-router.register('post', BlogPostViewSet)
+router.register('post', BlogPostViewSet, basename='blogpost')
 
 urlpatterns = router.urls

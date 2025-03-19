@@ -6,7 +6,7 @@ from .viewsets import UserViewSet, UserCreateViewSet
 
 router = DefaultRouter()
 
-router.register('users', UserViewSet)
+router.register('users', UserViewSet, basename='users')
 router.register('register', UserCreateViewSet, basename='user_register')
 
 urlpatterns =  router.urls

@@ -3,7 +3,7 @@ from .viewsets import CommentViewSet, LikeViewSet
 
 router = DefaultRouter()
 
-router.register('comments', CommentViewSet)
-router.register('likes', LikeViewSet)
+router.register('comments', CommentViewSet, basename='comments')
+router.register('likes', LikeViewSet, basename='likes')
 
 urlpatterns =  router.urls
