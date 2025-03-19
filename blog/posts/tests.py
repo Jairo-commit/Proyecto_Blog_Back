@@ -171,3 +171,5 @@ class PostTestCase(TestCase):
         response_actualizado = self.client.put(reverse('blogpost-detail', args=[response_original.data['id']]), updated_data, content_type="application/json")
 
         self.assertEqual(response_actualizado.status_code, status.HTTP_200_OK, "Error al actualizar el post")
+
+        #probando el nuevo workflow de github con este mensaje... preguntar a Jose si crear varias clases de testcases?
