@@ -1,4 +1,6 @@
 from rest_framework import permissions
+from posts.models import BlogPost
+from django.db.models import Q
 
 class BlogPostPermission(permissions.BasePermission):
 
@@ -34,4 +36,3 @@ class BlogPostPermission(permissions.BasePermission):
             )
 
         return False
-

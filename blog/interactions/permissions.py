@@ -1,21 +1,48 @@
 from rest_framework import permissions
-from .models import Comment
 from posts.models import BlogPost
+from django.db.models import Q
 
+#sirve para los get
+class CommentPermission(permissions.BasePermission): 
+    """
+    Permisos de comentarios basados en la lógica de acceso de BlogPost.
+    """
 
-class CommentPermission(permissions.BasePermission):
-    """
-    Permiso personalizado para controlar las acciones de los comentarios.
-    """
-    def has_object_permission(self, request, view, obj):
+    def has_permission(self, request, view):
         user = request.user
 
-        # Solo el autor del comentario puede editarlo o eliminarlo
-        if request.method in permissions.SAFE_METHODS:
+        # 🔹 Superusuarios y staff pueden hacer cualquier acción
+        if user.is_superuser or user.is_staff:
             return True
-        else:
-            if isinstance(obj, BlogPost): 
-                return obj.author == user or (user.groups.exists() and obj.author.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists())
 
-            if isinstance(obj, Comment):  
-                return obj.user == user or (user.groups.exists() and obj.user.groups.filter(id__in=user.groups.values_list("id", flat=True)).exists())
+        # 🔹 Usuarios no autenticados solo pueden acceder a posts con `public_access="Read"`
+        if not user.is_authenticated:
+            post_id = view.kwargs.get("pk")
+            return BlogPost.objects.filter(id=post_id, public_access="Read").exists()
+
+        # 🔹 Usuarios autenticados pueden comentar en posts según las reglas de `get_queryset`
+        query = Q(authenticated_access__in=["Read", "Read and Edit"]) | Q(author=user)
+        
+        user_groups = list(user.groups.all())
+        if user_groups:
+            query |= Q(group_access__in=["Read", "Read and Edit"], author__groups__in=user_groups)
+
+        post_id = view.kwargs.get("pk")  # Obtiene el ID del post desde la URL
+        return BlogPost.objects.filter(query, id=post_id).exists()
+
+#sirve para los request post
+class InteractionPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not user.is_authenticated:
+            return False  # Solo usuarios autenticados pueden dar like
+        
+        post_id = view.kwargs.get("pk")
+        return BlogPost.objects.filter(
+        Q(id=post_id) & (
+        Q(public_access="Read") | 
+        Q(authenticated_access__in=["Read", "Read and Edit"]) |
+        Q(author=user) |
+        Q(group_access__in=["Read", "Read and Edit"], author__groups__in=user.groups.all())
+        )
+        ).exists()

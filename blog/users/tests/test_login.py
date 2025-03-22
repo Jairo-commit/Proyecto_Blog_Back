@@ -27,15 +27,88 @@ def test_login_view_fail(createUsers):
     response = client.post(reverse("rest_framework:login"), {"username": "prueba1", "password": "test_password21"},follow=True)
     unauthenticated_user = get_user(client)             
 
-    assert response.status_code == 200                      #Test Redirect to login page
+    assert response.status_code == status.HTTP_200_OK 
+    assert response.request["PATH_INFO"] == reverse("rest_framework:login")               
     assert not unauthenticated_user.is_authenticated
 
 
-# def test_logout(ClientUser):
-#     client, _ = ClientUser
-#     response = client.post("/user/api-auth/login/", {"username": "testuser@test.com", "password": "test_password"},follow=True)
-#     assert "_auth_user_id" in client.session                        #Login First
+def test_logout(createUsers):
+    client, _ = createUsers
+    response = client.post(reverse("rest_framework:login"), {"username": "prueba1", "password": "test_password1"},follow=True)
+    assert "_auth_user_id" in client.session                        #Login First
+     
 
-#     response = client.post("/user/api-auth/logout/", follow=True)   #Logout
-#     assert response.status_code == 200                              #Test Redirect
-#     assert "_auth_user_id" not in client.session                    #Test Unlog"""
+    response = client.post(reverse("rest_framework:logout"), follow=True)   
+    unauthenticated_user = get_user(client) 
+    assert response.status_code == status.HTTP_200_OK                              
+    assert response.request["PATH_INFO"] == reverse("rest_framework:logout") 
+    assert not unauthenticated_user.is_authenticated                
+
+#Resgister tests----------------------------------------------------------------------------------------------------------------------------
+
+def test_success_register(createUsers):
+        
+        client,_ = createUsers
+        data = {
+            'username': 'test',
+            'password': 'test1234',
+            'first_name': 'nombre',
+            'last_name': 'apellido',
+            'email': 'example@example.com'
+        }
+        response = client.post(reverse('user_register-list'), data)
+        assert response.status_code == status.HTTP_201_CREATED
+        assert User.objects.count() == 2
+        user = User.objects.filter(username="test").first()
+        assert user is not None, "User not found"
+        assert user.username == "test"
+        assert user.check_password("test1234")
+
+def test_success_register_info_incomplete(createUsers):
+        
+        client,_ = createUsers
+        
+        data = {
+        'username': 'test1',
+        'password': 'test1234',
+        'first_name': '',
+        'last_name': 'apellido',
+        'email': 'example@example.com'
+        }
+        response = client.post(reverse('user_register-list'), data)
+        assert response.status_code == status.HTTP_201_CREATED
+
+        data = {
+            'username': 'test2',
+            'password': 'test1234',
+            'first_name': 'nombre',
+            'last_name': '',
+            'email': 'example@example.com'
+        }
+        response = client.post(reverse('user_register-list'), data)
+        assert response.status_code == status.HTTP_201_CREATED
+
+        data = {
+            'username': 'test3',
+            'password': 'test1234',
+            'first_name': 'nombre',
+            'last_name': 'apellido',
+            'email': ''
+        }
+        response = client.post(reverse('user_register-list'), data)
+        assert response.status_code == status.HTTP_201_CREATED
+
+def test_unsuccess_register(createUsers):
+        
+        client,_ = createUsers
+        
+        data = {
+        'username': 'test1',
+        'password': 'test1234',
+        'first_name': '',
+        'last_name': 'apellido',
+        'email': 'example@example.com',
+        'is_staff': True
+        }
+        response = client.post(reverse('user_register-list'), data)
+        assert response.status_code == status.HTTP_400_BAD_REQUEST

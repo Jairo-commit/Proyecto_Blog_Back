@@ -6,6 +6,7 @@ from django.urls import reverse
 
 
 from posts.models import BlogPost
+from interactions.models import Like
 
 
 @pytest.fixture
@@ -76,8 +77,8 @@ def post_prueba_read_public_access(createUsers):
     return BlogPost.objects.get(title="Post de prueba para loggueados")
 
 @pytest.fixture
-def post_prueba_read_authenticated_access(createUsers):
-    client,user1,_,_,_ = createUsers
+def post_prueba_with_likes_and_comments(createUsers):
+    client, user1, user2, user3, user4 = createUsers
 
     client.force_authenticate(user=user1)
 
@@ -85,15 +86,36 @@ def post_prueba_read_authenticated_access(createUsers):
     postdata = {
         "title": "Post de prueba para loggueados solo lectura",
         "content": "This post can be read by people who is loggued",
-        "public_access": "None",
+        "public_access": "Read",
         "authenticated_access": "Read",
         "group_access": "Read and Edit",
         "author_access": "Read and Edit",
     }
+    data_comment = {"content": "Esto es un test"}
 
-    client.post(reverse("blogpost-list"), json.dumps(postdata), content_type="application/json")
+    # 🔹 Crear el post y guardar la respuesta
+    response = client.post(reverse("blogpost-list"), json.dumps(postdata), content_type="application/json")
 
-    return BlogPost.objects.get(title="Post de prueba para loggueados solo lectura")
+    assert response.status_code == 201  # ✅ Asegurar que el post se creó correctamente
+
+    # 🔹 Extraer el ID del post recién creado
+    post_id = response.json()["id"]
+
+    # 🔹 Usuarios dando "like" al post
+    for user in [user1, user2, user3, user4]:
+        client.force_authenticate(user=user)
+        response_like = client.post(reverse("blogpost-giving-like", kwargs={"pk": post_id}))
+        response_comment = client.post(reverse("blogpost-add-comment", kwargs={"pk": post_id}), data_comment)
+        assert response_like.status_code == 200  # ✅ Asegurar que la petición fue exitosa
+        assert response_comment.status_code == 201
+
+    # 🔹 Verificar que el post tiene 4 likes
+    post = BlogPost.objects.get(id=post_id)
+    like_count = Like.objects.filter(post=post).count()
+    
+    assert like_count == 4, f"Se esperaban 4 likes, pero se encontraron {like_count}."
+
+    return post  # ✅ Retornar el post si todo es correcto
 
 @pytest.fixture
 def post_prueba_none_authenticated_access(createUsers):
@@ -116,7 +138,7 @@ def post_prueba_none_authenticated_access(createUsers):
     return BlogPost.objects.get(title="Post de prueba para el grupo")
 
 @pytest.fixture
-def post_prueba_read_group_access(createUsers):
+def post_prueba_read_only_access(createUsers):
     client,user1,_,_,_ = createUsers
 
     client.force_authenticate(user=user1)
@@ -126,7 +148,7 @@ def post_prueba_read_group_access(createUsers):
         "title": "Post de prueba para el grupo",
         "content": "This post can be edit for the team, but It can't be read by authenticated people",
         "public_access": "None",
-        "authenticated_access": "None",
+        "authenticated_access": "Read",
         "group_access": "Read",
         "author_access": "Read and Edit",
     }

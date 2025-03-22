@@ -17,6 +17,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         model = User
         fields = ('username','first_name', 'last_name', 'password', 'email')
 
+    def validate(self, data):
+        """Reject the is_staff field if it's included in the request."""
+        if "is_staff" in self.initial_data:
+            raise serializers.ValidationError({"is_staff": "You cannot set this field."})
+        return data
+
     def create(self, validated_data):
         username = validated_data['username']
         first_name = validated_data['first_name'] 
