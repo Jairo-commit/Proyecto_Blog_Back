@@ -4,10 +4,8 @@ from rest_framework.test import APIClient
 from django.contrib.auth.models import User, Group
 from django.urls import reverse
 
-
 from posts.models import BlogPost
 from interactions.models import Like
-
 
 @pytest.fixture
 def createUsers(db):
@@ -32,6 +30,7 @@ def createUsers(db):
     user4 = User.objects.create(email="user5@test.com",
                             username="prueba4",
                             password="test_password4",
+                            is_staff=True
                             )
     user4.groups.add(different_group)
     return client,user1,user2,user3,user4

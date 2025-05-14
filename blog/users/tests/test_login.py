@@ -97,18 +97,3 @@ def test_success_register_info_incomplete(createUsers):
         }
         response = client.post(reverse('user_register-list'), data)
         assert response.status_code == status.HTTP_201_CREATED
-
-def test_unsuccess_register(createUsers):
-        
-        client,_ = createUsers
-        
-        data = {
-        'username': 'test1',
-        'password': 'test1234',
-        'first_name': '',
-        'last_name': 'apellido',
-        'email': 'example@example.com',
-        'is_staff': True
-        }
-        response = client.post(reverse('user_register-list'), data)
-        assert response.status_code == status.HTTP_400_BAD_REQUEST

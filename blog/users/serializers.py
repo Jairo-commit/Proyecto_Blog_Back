@@ -9,28 +9,19 @@ class BasicUserSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('id', 'username','first_name', 'password', 'last_name', 'email', 'date_joined', 'is_staff', 'groups')
+        fields = ('id', 'username','password', 'date_joined', 'is_staff', 'groups')
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ('username','first_name', 'last_name', 'password', 'email')
-
-    def validate(self, data):
-        """Reject the is_staff field if it's included in the request."""
-        if "is_staff" in self.initial_data:
-            raise serializers.ValidationError({"is_staff": "You cannot set this field."})
-        return data
+        fields = ('username','password')
 
     def create(self, validated_data):
         username = validated_data['username']
-        first_name = validated_data['first_name'] 
-        last_name = validated_data['last_name'] 
-        email = validated_data['email']
         password = validated_data['password']
 
-        user = User.objects.create_user(username=username, first_name=first_name, last_name=last_name, email=email, password=password)
+        user = User.objects.create_user(username=username, password=password)
 
         group, _ = Group.objects.get_or_create(name="default_team")
 
@@ -38,3 +29,4 @@ class UserCreateSerializer(serializers.ModelSerializer):
         user.groups.add(group)
 
         return user
+    

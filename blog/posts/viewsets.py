@@ -12,6 +12,8 @@ from .serializers import BlogPostSerializer
 from .permissions import BlogPostPermission
 from interactions.serializers import CommentSerializer, LikeSerializer
 from .pagination import BlogPostPagination
+from interactions.pagination import LikePagination  # ajusta el path según tu estructura
+
 
 class BlogPostViewSet(viewsets.ModelViewSet):
     """
@@ -128,11 +130,17 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         GET: Obtener todos los likes de un post.
         """
         post = self.get_object()
+        likes = Like.objects.filter(post=post)
 
-        if request.method == 'GET':
-            likes = Like.objects.filter(post=post)
-            serializer = LikeSerializer(likes, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+        paginator = LikePagination()
+        page = paginator.paginate_queryset(likes, request, view=self)
+
+        if page is not None:
+            serializer = LikeSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
+        serializer = LikeSerializer(likes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
         
     
     @action(detail=True, 

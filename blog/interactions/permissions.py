@@ -37,6 +37,9 @@ class InteractionPermission(permissions.BasePermission):
         if not user.is_authenticated:
             return False  # Solo usuarios autenticados pueden dar like
         
+        if user.is_superuser or user.is_staff:
+            return True
+        
         post_id = view.kwargs.get("pk")
         return BlogPost.objects.filter(
         Q(id=post_id) & (

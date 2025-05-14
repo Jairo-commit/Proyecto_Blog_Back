@@ -256,6 +256,7 @@ def test_get_like_cannot_access(createUsers, post_prueba_with_likes_and_comments
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 def test_get_like_delete(createUsers, post_prueba_with_likes_and_comments):
+
     client, user1, user2, user3, _ = createUsers
 
     # 🔹 Obtener algunos likes
@@ -287,6 +288,41 @@ def test_get_like_delete(createUsers, post_prueba_with_likes_and_comments):
     client.force_authenticate(user=user1)
     response = client.delete(reverse("blogpost-get-like", kwargs={"pk": post_prueba_with_likes_and_comments.id, "like_pk": like_user1.id}))
     assert response.status_code == status.HTTP_204_NO_CONTENT
+
+def test_giving_like_as_staff_in_other_group(createUsers,post_prueba_only_author):
+    
+    client,_,user2,user3,user4 = createUsers
+    client.force_authenticate(user=user3) #No está ni en el equipo
+
+    # Ensure there are no likes before the request
+    assert Like.objects.filter(post=post_prueba_only_author, user=user3).count() == 0
+
+    response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_only_author.id}))
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    # Ensure the like was no created
+    assert Like.objects.filter(post=post_prueba_only_author, user=user3).count() == 0
+
+    client.force_authenticate(user=user2)  #No está ni en el equipo
+    # Ensure there are no likes before the request
+    assert Like.objects.filter(post=post_prueba_only_author, user=user2).count() == 0 
+
+    response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_only_author.id}))
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+    
+    # Ensure the like was no created
+    assert Like.objects.filter(post=post_prueba_only_author, user=user2).count() == 0
+
+    # Entrando como staff
+    client.force_authenticate(user=user4) #No está ni en el equipo
+
+    # Ensure there are no likes before the request
+    assert Like.objects.filter(post=post_prueba_only_author, user=user4).count() == 0
+
+    response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_only_author.id}))
+    assert response.status_code == status.HTTP_200_OK
+    # Ensure the like was created
+    assert Like.objects.filter(post=post_prueba_only_author, user=user4).count() == 1
 
 #Testing comments on a post --------------------------------------------------------------------------------------------------------------------
 

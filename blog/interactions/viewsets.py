@@ -79,37 +79,38 @@ class LikeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """ Filtra los likes según los permisos del usuario sobre los posts. """
         user = self.request.user
+        queryset = Like.objects.all()
 
-        # Superusers and staff get all likes
-        if user.is_superuser or user.is_staff:
-            return Like.objects.all()
-
-        # Unauthenticated users only see likes on publicly accessible posts
+        # Filtros de acceso (igual que antes)
         if not user.is_authenticated:
             accessible_posts = BlogPost.objects.filter(public_access__in=["Read", "Read and Edit"])
-            return Like.objects.filter(post__in=accessible_posts)
+        elif user.is_superuser or user.is_staff:
+            accessible_posts = BlogPost.objects.all()
+        else:
+            group_posts = BlogPost.objects.filter(
+                author__groups__in=user.groups.all(),
+                group_access__in=["Read", "Read and Edit"]
+            )
+            author_posts = BlogPost.objects.filter(
+                author=user,
+                author_access__in=["Read", "Read and Edit"]
+            )
+            authenticated_posts = BlogPost.objects.filter(
+                authenticated_access__in=["Read", "Read and Edit"]
+            )
+            accessible_posts = group_posts | author_posts | authenticated_posts
 
-        # Users in the same group as the post author
-        group_posts = BlogPost.objects.filter(
-            author__groups__in=user.groups.all(),
-            group_access__in=["Read", "Read and Edit"]
-        )
+        queryset = queryset.filter(post__in=accessible_posts)
+        # Aplicar filtros por query params
+        post_id = self.request.query_params.get('post_id')
+        user_id = self.request.query_params.get('user_id')
 
-        # Users who are the author of the post
-        author_posts = BlogPost.objects.filter(
-            author=user,
-            author_access__in=["Read", "Read and Edit"]
-        )
+        if post_id:
+            queryset = queryset.filter(post_id=post_id)
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
 
-        # Authenticated users without group match but with general authenticated access
-        authenticated_posts = BlogPost.objects.filter(
-            authenticated_access__in=["Read", "Read and Edit"]
-        )
-
-        # Merge all accessible posts
-        accessible_posts = group_posts | author_posts | authenticated_posts
-
-        return Like.objects.filter(post__in=accessible_posts) | Like.objects.filter(user=user)
+        return queryset
     
     def perform_create(self, serializer):
         """ Asigna el usuario y el post automáticamente al crear un comentario. """
