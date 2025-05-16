@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth.models import User, Group
+from rest_framework.validators import UniqueValidator
 
 class BasicUserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,6 +14,14 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UserCreateSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(
+        validators=[
+            UniqueValidator(
+                queryset=User.objects.all(),
+                message="Este nombre de usuario ya está en  uso."
+            )
+        ]
+    )
     class Meta:
         model = User
         fields = ('username','password')
@@ -25,7 +34,6 @@ class UserCreateSerializer(serializers.ModelSerializer):
 
         group, _ = Group.objects.get_or_create(name="default_team")
 
-        # Agregar el usuario al grupo
         user.groups.add(group)
 
         return user

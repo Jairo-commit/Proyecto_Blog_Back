@@ -12,7 +12,7 @@ from .serializers import BlogPostSerializer
 from .permissions import BlogPostPermission
 from interactions.serializers import CommentSerializer, LikeSerializer
 from .pagination import BlogPostPagination
-from interactions.pagination import LikePagination  # ajusta el path según tu estructura
+from interactions.pagination import LikePagination, CommentPagination  
 
 
 class BlogPostViewSet(viewsets.ModelViewSet):
@@ -91,8 +91,16 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         """
         GET: Obtener todos los comentarios de un post.
         """
-        post = self.get_object()  # Obtiene el post
+        post = self.get_object()
         comments = Comment.objects.filter(post=post)
+
+        paginator = CommentPagination()
+        page = paginator.paginate_queryset(comments, request, view=self)
+
+        if page is not None:
+            serializer = CommentSerializer(page, many=True)
+            return paginator.get_paginated_response(serializer.data)
+
         serializer = CommentSerializer(comments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
@@ -102,7 +110,7 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         url_path='add-comment',  # 🔹 Nuevo endpoint: /api/post/{post_id}/add-comment/
         permission_classes=[InteractionPermission],
         serializer_class=CommentSerializer
-    )
+    )    
     def add_comment(self, request, pk=None):
         """
         POST: Agregar un comentario al post si el usuario tiene permisos.

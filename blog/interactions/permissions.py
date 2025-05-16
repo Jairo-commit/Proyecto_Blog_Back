@@ -34,6 +34,7 @@ class CommentPermission(permissions.BasePermission):
 class InteractionPermission(permissions.BasePermission):
     def has_permission(self, request, view):
         user = request.user
+        
         if not user.is_authenticated:
             return False  # Solo usuarios autenticados pueden dar like
         
