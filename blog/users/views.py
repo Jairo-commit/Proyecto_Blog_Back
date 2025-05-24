@@ -11,10 +11,12 @@ class LogoutView(APIView):
 
     def post(self, request):
         try:
-            RefreshToken(request.data['refresh']).blacklist()
-            return Response({'message': 'Logged out successfully'}, status=status.HTTP_200_OK)
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_200_OK)
         except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(status=status.HTTP_400_BAD_REQUEST)
               
 class CurrentUserView(APIView):
     permission_classes = [permissions.IsAuthenticated]

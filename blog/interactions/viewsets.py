@@ -23,11 +23,11 @@ class CommentViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.is_superuser or user.is_staff:
-            return Comment.objects.all()
+            return Comment.objects.all().order_by("created_at")
 
         if not user.is_authenticated:
             accessible_posts = BlogPost.objects.filter(public_access__in=["Read", "Read and Edit"])
-            return Comment.objects.filter(post__in=accessible_posts)
+            return Comment.objects.filter(post__in=accessible_posts).order_by("created_at")
 
         group_posts = BlogPost.objects.filter(
             author__groups__in=user.groups.all(),
@@ -79,7 +79,7 @@ class LikeViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """ Filtra los likes según los permisos del usuario sobre los posts. """
         user = self.request.user
-        queryset = Like.objects.all()
+        queryset = Like.objects.all().order_by("id")
 
         # Filtros de acceso (igual que antes)
         if not user.is_authenticated:
@@ -110,7 +110,7 @@ class LikeViewSet(viewsets.ModelViewSet):
         if user_id:
             queryset = queryset.filter(user_id=user_id)
 
-        return queryset
+        return queryset.order_by("id")
     
     def perform_create(self, serializer):
         """ Asigna el usuario y el post automáticamente al crear un comentario. """

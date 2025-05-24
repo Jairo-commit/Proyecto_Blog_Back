@@ -175,3 +175,41 @@ def post_prueba_only_author(createUsers):
     client.post(reverse("blogpost-list"), json.dumps(postdata), content_type="application/json")
 
     return BlogPost.objects.get(title="Post de prueba para el grupo")
+
+@pytest.fixture
+def post_prueba_with_likes_and_comments_privado(createUsers):
+    client, user1, user2, user3, user4 = createUsers
+
+    client.force_authenticate(user=user1)
+
+    # Datos del nuevo post
+    postdata = {
+        "title": "Post de prueba para loggueados solo lectura",
+        "content": "This post can be read by people who is loggued",
+        "public_access": "None",
+        "authenticated_access": "None",
+        "group_access": "None",
+        "author_access": "Read and Edit",
+    }
+    data_comment = {"content": "Esto es un test"}
+
+    # 🔹 Crear el post y guardar la respuesta
+    response = client.post(reverse("blogpost-list"), json.dumps(postdata), content_type="application/json")
+
+    assert response.status_code == 201  # ✅ Asegurar que el post se creó correctamente
+
+    # 🔹 Extraer el ID del post recién creado
+    post_id = response.json()["id"]
+
+    response_like = client.post(reverse("blogpost-giving-like", kwargs={"pk": post_id}))
+    response_comment = client.post(reverse("blogpost-add-comment", kwargs={"pk": post_id}), data_comment)
+    assert response_like.status_code == 200  # ✅ Asegurar que la petición fue exitosa
+    assert response_comment.status_code == 201
+
+    # 🔹 Verificar que el post tiene 1 likes
+    post = BlogPost.objects.get(id=post_id)
+    like_count = Like.objects.filter(post=post).count()
+
+    assert like_count == 1, f"Se esperaban 1 like, pero se encontraron {like_count}."
+
+    return post  # ✅ Retornar el post si todo es correcto

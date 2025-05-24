@@ -138,15 +138,15 @@ def test_unauthenticated_user_read(createUsers,post_prueba_read_public_access):
     }
 
     response_put = client.put(reverse("blogpost-detail", args=[post_prueba_read_public_access.id]), json.dumps(postdata_modified), content_type="application/json") 
-    assert response_put.status_code == status.HTTP_403_FORBIDDEN
+    assert response_put.status_code == status.HTTP_401_UNAUTHORIZED
     postdata_modified2 = {
         "content": "You gotta be logged in edit: user1",
     }
     response_patch = client.patch(reverse("blogpost-detail", args=[post_prueba_read_public_access.id]), json.dumps(postdata_modified2), content_type="application/json") 
-    assert response_patch.status_code == status.HTTP_403_FORBIDDEN
+    assert response_patch.status_code == status.HTTP_401_UNAUTHORIZED
     
     response_delete = client.delete(reverse("blogpost-detail", args=[post_prueba_read_public_access.id])) 
-    assert response_delete.status_code == status.HTTP_403_FORBIDDEN
+    assert response_delete.status_code == status.HTTP_401_UNAUTHORIZED
 
 #Test GET, POST, PATCH and DELETE "authenticated_access": "Read and Edit",----------------------------------------------------------------------------------------------------
 

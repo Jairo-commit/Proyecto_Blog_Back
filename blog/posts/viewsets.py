@@ -35,10 +35,10 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.is_superuser or user.is_staff:
-            return BlogPost.objects.all()
+            return BlogPost.objects.all().order_by("-created_at")
 
         if not user.is_authenticated:
-            return BlogPost.objects.filter(public_access="Read")
+            return BlogPost.objects.filter(public_access="Read").order_by("-created_at")
 
         # Base query: Public access, authenticated access, or user's own posts
         query = Q(authenticated_access__in=["Read", "Read and Edit"]) | Q(author=user)
@@ -47,7 +47,7 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         if user_groups:
             query |= Q(group_access__in=["Read", "Read and Edit"], author__groups__in=user_groups)
 
-        return BlogPost.objects.filter(query).distinct()
+        return BlogPost.objects.filter(query).distinct().order_by('-created_at')
 
     def perform_create(self, serializer):
         """
@@ -92,7 +92,7 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         GET: Obtener todos los comentarios de un post.
         """
         post = self.get_object()
-        comments = Comment.objects.filter(post=post)
+        comments = Comment.objects.filter(post=post).order_by("created_at")
 
         paginator = CommentPagination()
         page = paginator.paginate_queryset(comments, request, view=self)
@@ -138,7 +138,7 @@ class BlogPostViewSet(viewsets.ModelViewSet):
         GET: Obtener todos los likes de un post.
         """
         post = self.get_object()
-        likes = Like.objects.filter(post=post)
+        likes = Like.objects.filter(post=post).order_by("id")
 
         paginator = LikePagination()
         page = paginator.paginate_queryset(likes, request, view=self)

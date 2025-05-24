@@ -3,7 +3,7 @@ import json
 from django.urls import reverse
 from rest_framework import status
 
-from test_setup_interactions import createUsers,post_prueba_read_public_access, post_prueba_only_author, post_prueba_with_likes_and_comments, post_prueba_read_only_access
+from test_setup_interactions import createUsers,post_prueba_with_likes_and_comments_privado, post_prueba_read_public_access, post_prueba_only_author, post_prueba_with_likes_and_comments, post_prueba_read_only_access
 from interactions.models import Like, Comment
 
 #Testing comments on a post --------------------------------------------------------------------------------------------------------------------
@@ -42,7 +42,7 @@ def test_giving_like_read_and_edit_access(createUsers,post_prueba_read_public_ac
     client.force_authenticate(user=None)
 
     response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_read_public_access.id}))
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     client.force_authenticate(user=user2)
 
     response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_read_public_access.id}))
@@ -83,7 +83,7 @@ def test_giving_like_anonymous(createUsers,post_prueba_read_public_access):
     client.force_authenticate(user=None)
 
     response = client.post(reverse("blogpost-giving-like",kwargs={"pk": post_prueba_read_public_access.id}))
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 def test_giving_like_post_cannot_read(createUsers,post_prueba_only_author):
 
@@ -118,24 +118,24 @@ def test_list_likes_of_post(createUsers,post_prueba_with_likes_and_comments):
     assert response.status_code == status.HTTP_200_OK 
 
     response_data = response.json()  # ✅ Obtiene el contenido JSON de la respuesta
-    assert len(response_data) == 4  # ✅ Asegura que hay 4 likes en la lista
+    assert response_data["total_count"] == 4  # ✅ Asegura que hay 4 likes en la lista
 
 
     client.force_authenticate(user=user2)
 
     response = client.get(reverse("blogpost-list-likes",kwargs={"pk": post_prueba_with_likes_and_comments.id}))
-    assert response.status_code == status.HTTP_200_OK 
+    assert response.status_code == status.HTTP_200_OK
 
     response_data = response.json()  # ✅ Obtiene el contenido JSON de la respuesta
-    assert len(response_data) == 4  # ✅ Asegura que hay 4 likes en la lista
+    assert response_data["total_count"] == 4  # ✅ Asegura que hay 4 likes en la lista
 
     client.force_authenticate(user=user3)
 
     response = client.get(reverse("blogpost-list-likes",kwargs={"pk": post_prueba_with_likes_and_comments.id}))
-    assert response.status_code == status.HTTP_200_OK 
+    assert response.status_code == status.HTTP_200_OK
 
     response_data = response.json()  # ✅ Obtiene el contenido JSON de la respuesta
-    assert len(response_data) == 4  # ✅ Asegura que hay 4 likes en la lista
+    assert response_data["total_count"] == 4  # ✅ Asegura que hay 4 likes en la lista
 
 def test_list_likes_of_post_no_access(createUsers,post_prueba_with_likes_and_comments):
     client,user1,user2,user3,_ = createUsers
@@ -226,10 +226,10 @@ def test_get_like_cannot_access(createUsers, post_prueba_with_likes_and_comments
     like_user1 = Like.objects.get(post=post_prueba_with_likes_and_comments, user=user1)
     like_user3 = Like.objects.get(post=post_prueba_with_likes_and_comments, user=user3)
 
-    # 🔹 Usuario no autenticado intenta ver un like (debería fallar con 403)
+    # 🔹 Usuario no autenticado intenta ver un like (debería fallar con 401)
     client.force_authenticate(user=None)
     response = client.get(reverse("blogpost-get-like", kwargs={"pk": post_prueba_with_likes_and_comments.id, "like_pk": like_user1.id}))
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     # 🔹 User1 intenta ver su propio like y el de user3 (debería permitirlo)
     client.force_authenticate(user=user1)
@@ -336,8 +336,8 @@ def test_list_comment_post_with_access(createUsers, post_prueba_read_public_acce
 
     response_data = response.json()  # 🔹 Convertimos la respuesta a JSON
 
-    assert isinstance(response_data, list), "La respuesta no es una lista de comentarios"  # 🔹 Verificamos que sea una lista
-    assert len(response_data) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data)}"
+    assert isinstance(response_data["results"], list) # 🔹 Verificamos que sea una lista
+    assert len(response_data["results"]) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data['results'])}"
 
     client.force_authenticate(user=user2)
 
@@ -346,8 +346,8 @@ def test_list_comment_post_with_access(createUsers, post_prueba_read_public_acce
 
     response_data = response.json()  # 🔹 Convertimos la respuesta a JSON
 
-    assert isinstance(response_data, list), "La respuesta no es una lista de comentarios"  # 🔹 Verificamos que sea una lista
-    assert len(response_data) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data)}"
+    assert isinstance(response_data["results"], list), "La respuesta no es una lista de comentarios"  # 🔹 Verificamos que sea una lista
+    assert len(response_data["results"]) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data['results'])}"
 
     client.force_authenticate(user=user3)
 
@@ -356,8 +356,8 @@ def test_list_comment_post_with_access(createUsers, post_prueba_read_public_acce
 
     response_data = response.json()  # 🔹 Convertimos la respuesta a JSON
 
-    assert isinstance(response_data, list), "La respuesta no es una lista de comentarios"  # 🔹 Verificamos que sea una lista
-    assert len(response_data) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data)}"
+    assert isinstance(response_data["results"], list), "La respuesta no es una lista de comentarios"  # 🔹 Verificamos que sea una lista
+    assert len(response_data["results"]) == 0, f"Se esperaban 0 comentarios, pero se encontraron {len(response_data['results'])}"
 
 def test_list_comment_post_with_no_access(createUsers, post_prueba_read_public_access):
     client,user1,user2,user3,_ = createUsers
@@ -378,9 +378,7 @@ def test_list_comment_post_with_no_access(createUsers, post_prueba_read_public_a
     client.force_authenticate(user=None)
 
     response = client.get(reverse("blogpost-list-comments", kwargs={"pk": post_prueba_read_public_access.id}))
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     client.force_authenticate(user=user2)
 
     response = client.get(reverse("blogpost-list-comments", kwargs={"pk": post_prueba_read_public_access.id}))
@@ -400,7 +398,7 @@ def test_list_comment_commenting_read_access(createUsers, post_prueba_read_only_
     client.force_authenticate(user=None) 
 
     response = client.post(reverse("blogpost-add-comment", kwargs={"pk": post_prueba_read_only_access.id}), data_comment)
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     #autor
     client.force_authenticate(user=user1) 
 
@@ -431,7 +429,7 @@ def test_list_comment_commenting_read_and_edit_access(createUsers, post_prueba_r
     client.force_authenticate(user=None) 
 
     response = client.post(reverse("blogpost-add-comment", kwargs={"pk": post_prueba_read_public_access.id}), data_comment)
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
     #autor
     client.force_authenticate(user=user1) 
 
@@ -510,7 +508,7 @@ def test_get_comment_cannot_access(createUsers, post_prueba_with_likes_and_comme
     # 🔹 Usuario no autenticado intenta ver un like (debería fallar con 403)
     client.force_authenticate(user=None)
     response = client.get(reverse("blogpost-get-comment", kwargs={"pk": post_prueba_with_likes_and_comments.id, "comment_pk": comment_user1.id}))
-    assert response.status_code == status.HTTP_403_FORBIDDEN
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
     # 🔹 User1 intenta ver su propio like y el de user3 (debería permitirlo)
     client.force_authenticate(user=user1)
@@ -537,6 +535,7 @@ def test_get_comment_cannot_access(createUsers, post_prueba_with_likes_and_comme
     assert response.status_code == status.HTTP_403_FORBIDDEN
 
 def test_comment_permissions(createUsers, post_prueba_with_likes_and_comments):
+
     """
     Verifica que solo los autores de los comentarios puedan editarlos o eliminarlos.
     - Usuarios no autenticados no pueden modificar ni eliminar comentarios.
@@ -612,3 +611,88 @@ def test_comment_permissions(createUsers, post_prueba_with_likes_and_comments):
 
     response_delete = client.delete(reverse("blogpost-get-comment", kwargs={"pk": post_prueba_with_likes_and_comments.id, "comment_pk": comment_user1.id}))
     assert response_delete.status_code == status.HTTP_204_NO_CONTENT, "User1 debería poder eliminar su propio comentario"
+
+#Testing likes on a post http://127.0.0.1:8000/api/likes/` --------------------------------------------------------------------------------------------------------------------
+
+def test_filter_likes_by_post_and_user(post_prueba_with_likes_and_comments, createUsers):
+    client, user1, _, _, _ = createUsers
+    post = post_prueba_with_likes_and_comments
+
+    # Autenticar como el autor
+    client.force_authenticate(user=user1)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'user_id': user1.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert len(response.data["results"]) == 1
+
+    result = response.data["results"][0]
+    assert result["user"] == user1.username
+    assert result["post_id"] == post.id
+
+def test_likes_pagination(post_prueba_with_likes_and_comments, createUsers):
+    client, user1, _, _, _ = createUsers
+    post = post_prueba_with_likes_and_comments
+
+    client.force_authenticate(user=user1)
+
+    url = reverse('likes-list')
+
+    # Pide la primera página
+    response_page_1 = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+    assert response_page_1.status_code == status.HTTP_200_OK
+    assert response_page_1.data["total_count"] == 4  # hay 4 likes en total
+    assert len(response_page_1.data["results"]) == 1
+    assert "next" in response_page_1.data
+    assert response_page_1.data["next"] is not None
+
+    # Pide la segunda página
+    response_page_2 = client.get(url, {
+        'post_id': post.id,
+        'page': 2
+    })
+    assert response_page_2.status_code == status.HTTP_200_OK
+    assert len(response_page_2.data["results"]) == 1
+    assert response_page_2.data["next"] is not None
+
+    # Pide la última página
+    response_page_4 = client.get(url, {
+        'post_id': post.id,
+        'page': 4
+    })
+    assert response_page_4.status_code == status.HTTP_200_OK
+    assert len(response_page_4.data["results"]) == 1
+    assert response_page_4.data["next"] is None  # no hay más páginas
+
+    # Pide una página inexistente
+    response_page_5 = client.get(url, {
+        'post_id': post.id,
+        'page': 5
+    })
+    assert response_page_5.status_code == status.HTTP_404_NOT_FOUND
+
+def test_user_cannot_view_private_post_likes(post_prueba_with_likes_and_comments_privado, createUsers):
+    client, _, _, user2, _ = createUsers
+    post = post_prueba_with_likes_and_comments_privado
+
+    # Autenticar como un usuario no autorizado (user2)
+    client.force_authenticate(user=user2)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # ✅ Debería devolver 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 0
+    assert len(response.data["results"]) == 0
