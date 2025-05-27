@@ -3,7 +3,7 @@ import json
 from django.urls import reverse
 from rest_framework import status
 
-from test_setup_interactions import createUsers,post_prueba_with_likes_and_comments_privado, post_prueba_read_public_access, post_prueba_only_author, post_prueba_with_likes_and_comments, post_prueba_read_only_access
+from test_setup_interactions import createUsers, post_prueba_with_likes_and_comments_authenticated_access, post_prueba_with_likes_and_comments_privado, post_prueba_with_likes_and_comments_group_access,post_prueba_read_public_access, post_prueba_only_author, post_prueba_with_likes_and_comments, post_prueba_read_only_access
 from interactions.models import Like, Comment
 
 #Testing comments on a post --------------------------------------------------------------------------------------------------------------------
@@ -615,7 +615,7 @@ def test_comment_permissions(createUsers, post_prueba_with_likes_and_comments):
 #Testing likes on a post http://127.0.0.1:8000/api/likes/` --------------------------------------------------------------------------------------------------------------------
 
 def test_filter_likes_by_post_and_user(post_prueba_with_likes_and_comments, createUsers):
-    client, user1, _, _, _ = createUsers
+    client, user1, user2, user3, _ = createUsers
     post = post_prueba_with_likes_and_comments
 
     # Autenticar como el autor
@@ -629,7 +629,54 @@ def test_filter_likes_by_post_and_user(post_prueba_with_likes_and_comments, crea
     })
 
     assert response.status_code == status.HTTP_200_OK
-    assert len(response.data["results"]) == 1
+    assert response.data["total_count"] == 1
+
+    result = response.data["results"][0]
+    assert result["user"] == user1.username
+    assert result["post_id"] == post.id
+
+    # Autenticar como el alguien diferente al autor
+    client.force_authenticate(user=user2)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'user_id': user1.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+    result = response.data["results"][0]
+    assert result["user"] == user1.username
+    assert result["post_id"] == post.id
+
+    # Autenticar como el usuario en grupo diferente
+    client.force_authenticate(user=user3)
+    response = client.get(url, {
+        'post_id': post.id,
+        'user_id': user1.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+    result = response.data["results"][0]
+    assert result["user"] == user1.username
+    assert result["post_id"] == post.id
+
+    # Autenticar como un no autenticado
+    client.force_authenticate(user=None)
+    response = client.get(url, {
+        'post_id': post.id,
+        'user_id': user1.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
 
     result = response.data["results"][0]
     assert result["user"] == user1.username
@@ -680,7 +727,7 @@ def test_likes_pagination(post_prueba_with_likes_and_comments, createUsers):
     assert response_page_5.status_code == status.HTTP_404_NOT_FOUND
 
 def test_user_cannot_view_private_post_likes(post_prueba_with_likes_and_comments_privado, createUsers):
-    client, _, _, user2, _ = createUsers
+    client, user1, user2, user3, _ = createUsers
     post = post_prueba_with_likes_and_comments_privado
 
     # Autenticar como un usuario no autorizado (user2)
@@ -692,7 +739,150 @@ def test_user_cannot_view_private_post_likes(post_prueba_with_likes_and_comments
         'page': 1
     })
 
-    # ✅ Debería devolver 200 pero sin resultados visibles
+    # devuelve 200 pero sin resultados visibles
     assert response.status_code == status.HTTP_200_OK
     assert response.data["total_count"] == 0
-    assert len(response.data["results"]) == 0
+
+    # Autenticar como un usuario no autorizado (user3)
+    client.force_authenticate(user=user3)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 0
+
+    # Autenticar como un usuario autorizado (user1)
+    client.force_authenticate(user=user1)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+def test_user_cannot_view_private_post_likes_group_access(post_prueba_with_likes_and_comments_group_access, createUsers):
+    client, user1, user2, user3, _ = createUsers
+    post = post_prueba_with_likes_and_comments_group_access
+
+    client.force_authenticate(user=user1)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+    # Autenticar como un usuario no autorizado (user3)
+    client.force_authenticate(user=user3)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 0
+
+    # Autenticar como un usuario autorizado (user1)
+    client.force_authenticate(user=user2)
+
+    url = reverse('likes-list')
+
+    response_like = client.post(reverse("blogpost-giving-like", kwargs={"pk": post.id}))
+    assert response_like.status_code == 200  # ✅ Asegurar que la petición fue exitosa
+
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 2
+
+        # Autenticar como un usuario no autenticado
+    client.force_authenticate(user=None)
+
+    url = reverse('likes-list')
+
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 0
+
+def test_user_cannot_view_private_post_likes_authenticated_access(post_prueba_with_likes_and_comments_authenticated_access, createUsers):
+    client, user1, user2, user3, _ = createUsers
+    post = post_prueba_with_likes_and_comments_authenticated_access
+
+    client.force_authenticate(user=user1)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+    client.force_authenticate(user=user3)
+
+    url = reverse('likes-list')
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    # devuelve 200 pero sin resultados visibles
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 1
+
+    client.force_authenticate(user=user2)
+
+    url = reverse('likes-list')
+
+    response_like = client.post(reverse("blogpost-giving-like", kwargs={"pk": post.id}))
+    assert response_like.status_code == 200  # ✅ Asegurar que la petición fue exitosa
+
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 2
+
+    # Autenticar como un usuario no autenticado
+    client.force_authenticate(user=None)
+
+    url = reverse('likes-list')
+
+    response = client.get(url, {
+        'post_id': post.id,
+        'page': 1
+    })
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["total_count"] == 0
+
+
+    
+
